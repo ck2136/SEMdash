@@ -1,0 +1,344 @@
+## ui.R ##
+library(shinydashboard)
+library(DT)
+library(shinyAce)
+library(formattable)
+dashboardPage(
+  
+  # Header
+  dashboardHeader(title = "SEM Wearable"),
+  
+  
+  # Sidebar Menus
+  dashboardSidebar(
+    sidebarMenu(
+      menuItem("Dashboard", tabName = "dashboard", icon = icon("dashboard")),
+      menuItem("Data and Summary", tabName = "data", icon = icon("th")),
+      menuItem("Correlation", tabName = "corr", icon = icon("th")),
+      menuItem("Model Specification", tabName = "model", icon = icon("th")),
+      menuItem('Result', tabName = 'results', icon = icon('th'), 
+                 collapsible = 
+                   menuSubItem('random', tabName = 'random'),
+                   menuSubItem('Regression Output', tabName = 'regresult'),
+                   menuSubItem('Plots', tabName = 'plot'),
+                   menuSubItem('Diagnostics', tabName = 'diag')
+        )
+      
+      
+    )
+  ),
+  
+  # Body of the Dashboard
+  dashboardBody(
+    tabItems(
+      
+      # First tab content DashBoard
+      tabItem(tabName = "dashboard",
+              
+              h2("Introduction"),
+              fluidRow(
+                box(
+                  h4('This is a dashboard for Structural Equation Modeling, Confirmatory Factor Analysis, Latent Growth Curve Modeling, and Partial Least Square Structural Equation Modeling'),
+                  h4("There are several important key points to remember"),
+                  h4(strong("Number 1:"),"User needs to have his/her own .csv file to input into the 'Data and Summary' Tab (Second tab on the left"),
+                  h4(strong("Number 2:"),"User needs to have enough domain knowledge and information regarding the relationship between variables to set up the model equation in the 'Model Specification' Tab (Fourth tab on the left"),
+                  h4(strong("Number 3:"),"In addition to the model specification, user needs to be familiar with the R syntax in setting up the equations for the CFA, SEM, and/or GCM"),
+                  h4(strong("Number 4:"),"The outputs that are generated in the 'Result' tab (Bottom tab on the left) needs the user to be comfortable with the 'lavaan' package output. (There is a link in the model specification to the lavaan package vignette)")
+                  
+                ,width = 13)
+              )
+              
+              
+      ),
+      
+      # Second Tab content: Data and SUmmary
+      tabItem(tabName = "data",
+              
+              h2("Please Enter CSV Data"),
+              
+              fileInput('datafile', 'Choose CSV file',
+                        accept=c('text/csv', 'text/comma-separated-values,text/plain')),
+              
+              h2("Select Variables"),
+              uiOutput("Variables"),
+              
+              
+              # View summary statistics
+              h3("Summary Statistics"),
+              
+              fluidRow( verbatimTextOutput("sum")),
+              
+              h3("Correlation"),
+              
+              fluidRow(verbatimTextOutput("correl")),
+              
+              # Create row to check the data
+              h3("Data View"),
+              fluidRow( dataTableOutput("filetable")),
+              
+              strong('R session info'),
+              verbatimTextOutput("info")
+              
+      ),
+      
+      # Second Tab content: Data and SUmmary
+      tabItem(tabName = "corr",
+              
+              h2("Correlation of Variables"),
+              
+              
+              fluidRow(
+                box(
+                  h3("Correlation Matrix"),
+                  plotOutput("corPlot"), width = 12
+                )
+              )
+              
+      ),
+      
+      
+      # Third Tab Content
+      tabItem(tabName = "model",
+              
+              p('Estimation may take a few seconds to minutes depending on the dataset.'),
+              
+              h3("Analysis"),
+              
+              fluidRow(
+                box(
+                    selectInput('anal','Choose and Analysis',
+                                choices =  c("Confirmatory Factor Analysis" = 'cfa',
+                                  "Structural Equation Model: SEM or Path Analysis" = 'sem',
+                                  "Growth Curve Analysis" = 'growth',
+                                  "Partial Least Square SEM" = "pls"), selected = 'pls')
+              )),
+              
+            
+              h3("Specify the model"),
+              
+              p('For CBSEM See',
+                a("lavaan", href="http://lavaan.ugent.be/", target="_blank"),
+                'for the syntax.'),
+              
+              conditionalPanel(
+                condition = "input.anal != 'pls'",
+                        aceEditor("model", mode="r", value="# Model 1
+                        IU ~ PEW + PUW + PEUW + PEA + PUA + PEUA
+                          UseDay ~ IU
+                          Workoutweek ~ UseDay")
+                
+              ) ,
+              
+              # If using PLS then specify measurement and structural model
+              conditionalPanel(
+                condition = "input.anal == 'pls'",
+                
+                fluidRow(
+                  box( width = 8, 
+                    h3("Specify Inner Model"),
+                    aceEditor("plsinner", mode="r", 
+                              value="
+PEW <- PUW <- PEUW <- PEA <- PUA <- PEUA <-c(0,0,0,0,0,0,0,0)
+IU <- c(1,1,1,1,1,1,0,0)
+Use <- c(0,0,0,0,0,0,1,0)
+wear_path = rbind(PEW, PUW, PEUW, PEA, PUA, PEUA, IU, Use)
+wear_blocks = list(1:4,5:8,9:11,12:15,16:19,20:22,23:25,26:28)
+wear_modes = c('A','A','A','A','A','A','A','B')
+wear_pls = plspm(dat, wear_path, wear_blocks, modes = wear_modes)
+wear_pls", 
+                              height = "200px")
+                  ),
+                  box( width = 4,
+                       h3("Select Measurement Variables"),
+                       uiOutput("Variablespls"))
+                )
+              ),
+              
+              
+              # Conditional Panel to show up if doing CBSEM
+              conditionalPanel(
+                condition = "input.anal != 'pls'",
+                fluidRow(
+                  h3("Estimator Options"),
+                  box("Estimator Options", icon = icon("table", lib = "font-awesome"),
+                      
+                      radioButtons("estimatoroptions", strong("Estimator Options"),
+                                   c("Maximum likelihood" = "ML",
+                                     "Generalized least squares" = "GLS",
+                                     "Weighted least squares (sometimes called ADF estimation)" = "WLS",
+                                     "Unweighted least squares" = "ULS",
+                                     "Diagonally weighted least squares" = "DWLS"
+                                   ), selected = "ML")
+                      
+                  ),
+                  box("Model Options", icon = icon("list", lib = "font-awesome"),
+                      
+                      radioButtons("orthogonaloptions", strong("Orthogonal"),
+                                   c("True" = "TRUE",
+                                     "False" = "FALSE"
+                                   ), selected = "FALSE"),
+                      br(),
+                      p("If TRUE is selected the exogenous latent variables are assumed to be uncorrelated, by defualt lavaan sets this to false"),
+                      br()
+                      
+                  ),
+                  
+                  box("Standard Errors Options", icon = icon("cog", lib = "font-awesome"),
+                      
+                      radioButtons("seoptions", strong("Method for Computing Standard Errors"),
+                                   c("Conventional Standard Errors" = "standard",
+                                     "First-order Derivatives" = "first.order",
+                                     "Conventional Robust" = "robust.sem",
+                                     "Bootstrap" = "bootstrap",
+                                     "None" = "none"
+                                   ), selected = "standard"),
+                      numericInput("bootstrapoptions", label = "Number of bootstrap draws, if bootstrapping is used." , value = 1000),
+                      p("Using bootstrap will take some awhile even when hosted locally")
+                  )
+                  
+                  
+                )
+              )
+              
+              
+              
+              
+
+      ),
+      
+    
+      # Fourth tab content
+      tabItem(tabName = "regresult",
+              
+              h2("Result"),
+              
+              conditionalPanel(
+                condition = "input.anal == 'pls'",
+                fluidRow(
+                  box(
+                    h3("Output"),
+                    verbatimTextOutput("result")
+                    ,width = 12
+                  )
+                )
+              ),
+              
+              conditionalPanel(
+                condition = "input.anal != 'pls'",
+                fluidRow(
+                  box(
+                    h3("Standardized Estimates"),
+                    formattableOutput("stdsol"),
+                    h3("Regression Summary"),
+                    verbatimTextOutput("result1")
+                    ,width = 12
+                  )
+                )
+              )
+              
+              
+      ),
+      
+      # fifth tab: Plot submenu of result
+      tabItem(tabName = "plot",
+              
+              conditionalPanel(
+                condition = "input.anal != 'pls'",
+                fluidRow(
+                  box(width = 12,
+                    h2("Plot"),
+                    h3("Plot Options"),
+                    fluidRow(
+                      box(
+                        selectInput("pltopt", label = "Standardized or Non Standardized Parameters:",
+                                    choices = c("No weight" = "path",
+                                                "Standardized" = "std",
+                                                "Unstandardized" = "est",
+                                                "Equality Cont" = "eq",
+                                                "Mixed Colors" = "col"))
+                      ),
+                      box(
+                        selectInput("pltstyl", label = "Residual Variance:",
+                                    choices = c("RAM" = "ram",
+                                                "MX" = "mx",
+                                                "OpenMX" = "OpenMx",
+                                                "LISREL" = "lisrel"))
+                      ),
+                      box(
+                        radioButtons("lay", strong("Plot Layout"),
+                                     c("Circle" = "circle",
+                                       "Circle2" = "circles",
+                                       "Tree" = "tree",
+                                       "Tree2" = "tree2",
+                                       "Spring" = "spring",
+                                       "Spring2" = "spring2"
+                                     ), selected = "tree2", inline = TRUE)
+                      )
+                    )
+                    
+                    
+                    
+                  )
+                  
+                ),
+                fluidRow(
+                  
+                  box(
+                    h3("Diagram"), plotOutput("plot", height = 700), width = 12
+                  )),
+                fluidRow(
+                  box(
+                    p("Tree"),
+                    p("The integrated tree-like layout. Places exogenous variables at the top and endogenous variables at the bottom. See 'details' for more details."),
+                    p("Tree2"),
+                    p("Calls the layout.reingold.tilford function from the igraph package (Csardi & Nepusz, 2006), which uses the Reingold-Tilford algorithm (Reingold & Tilford, 1981). Before calling the algorithm roots are chosen and a slightly modified version of the graph is used to produce consistent results. See 'details'."),
+                    p("Circle"),
+                    p("The same layout as tree, except that afterwards the horizontal levels of the layout are placed in circles. Especially useful for models with a large number of manifest variables and a relatively small number of latent variables."),
+                    p("Circle2"),
+                    p("The same layout as tree2, except that afterwards the horizontal levels of the layout are placed in circles"),
+                    p("Spring"),
+                    p("Calls the spring layout in qgraph, which uses the Fruchterman-reingold algorithm (Fruchterman & Reingold, 1991)."), width = 12) 
+                )
+                  ),
+              conditionalPanel(
+                condition = "input.anal == 'pls'",
+                fluidRow(
+                  box(width = 12,
+                    h3("Structural Model"),
+                    box(width=12,
+                        plotOutput("plsinner", height = 700)
+                        )
+                  ),
+                  box(width = 12,
+                      h3("Measurement Model"),
+                      plotOutput("plsouter", height = 700))
+                )
+
+      )
+      )
+      ,
+      
+      # Sixth tab: Diagnostic
+      tabItem(tabName = "diag",
+              h2("Diagnostic"),
+              
+              fluidRow(
+                box(
+                  h4("R Squared"),
+                  verbatimTextOutput("r2"),
+                  h4("Fit Measures"),
+                  verbatimTextOutput("fm")
+                  , width = 12
+                )
+              )
+              
+              
+      )
+      
+      
+      
+      
+    )
+  )
+)
+
