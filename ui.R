@@ -6,7 +6,7 @@ library(formattable)
 dashboardPage(
   
   # Header
-  dashboardHeader(title = "SEM Wearable"),
+  dashboardHeader(title = "SEM Dashboard"),
   
   
   # Sidebar Menus
@@ -42,7 +42,7 @@ dashboardPage(
                   h4("There are several important key points to remember"),
                   h4(strong("Number 1:"),"User needs to have his/her own .csv file to input into the 'Data and Summary' Tab (Second tab on the left"),
                   h4(strong("Number 2:"),"User needs to have enough domain knowledge and information regarding the relationship between variables to set up the model equation in the 'Model Specification' Tab (Fourth tab on the left"),
-                  h4(strong("Number 3:"),"In addition to the model specification, user needs to be familiar with the R syntax in setting up the equations for the CFA, SEM, and/or GCM"),
+                  h4(strong("Number 3:"),"In addition to the model specification, user needs to be familiar with the R syntax in setting up the equations for the EFA, CFA, SEM, and/or GCM"),
                   h4(strong("Number 4:"),"The outputs that are generated in the 'Result' tab (Bottom tab on the left) needs the user to be comfortable with the 'lavaan' package output. (There is a link in the model specification to the lavaan package vignette)")
                   
                 ,width = 13)
@@ -106,8 +106,10 @@ dashboardPage(
               
               fluidRow(
                 box(
-                    selectInput('anal','Choose and Analysis',
-                                choices =  c("Confirmatory Factor Analysis" = 'cfa',
+                    selectInput('anal','Choose an Analysis',
+                                choices =  c(
+                                  "Exploratory Factor Analysis" = 'efa',
+                                  "Confirmatory Factor Analysis" = 'cfa',
                                   "Structural Equation Model: SEM or Path Analysis" = 'sem',
                                   "Growth Curve Analysis" = 'growth',
                                   "Partial Least Square SEM" = "pls"), selected = 'pls')
@@ -120,14 +122,74 @@ dashboardPage(
                 a("lavaan", href="http://lavaan.ugent.be/", target="_blank"),
                 'for the syntax.'),
               
+              
+              # Conditional Panel if Choosing Exploratory Factor Analysis
               conditionalPanel(
                 condition = "input.anal != 'pls'",
-                        aceEditor("model", mode="r", value="# Model 1
+                
+                fluidRow(
+                  box(
+                    width = 8,
+                    aceEditor("model", mode="r", value="# Model 1
                         IU ~ PEW + PUW + PEUW + PEA + PUA + PEUA
-                          UseDay ~ IU
-                          Workoutweek ~ UseDay")
+                              UseDay ~ IU
+                              Workoutweek ~ UseDay"
+                              , 
+                              height = "200px")
+                  ),
+                  box( width = 4,
+                       h3("Select Measurement Variables"),
+                       uiOutput("Variablesnonpls"))
+                  
+                )
+                        
                 
               ) ,
+              
+              # Options for EFA
+              conditionalPanel(
+                condition = "input.anal == 'efa'",
+                fluidRow(
+                  box(
+                    radioButtons("efalysisopt", strong("Analysis Options"),
+                                     c("Maximum likelihood" = "ML",
+                                       "Parallel Analysis" = "pa"
+                                     ), selected = "ML")
+                        
+                    ),
+                  box(
+                    sliderInput("numfactor", strong("Number of Factors"), step = 1, 
+                                min = 1, max = 10,  value = 3)
+                  ),
+                  box(
+                    radioButtons("rotfactor", strong("Factor Rotation: for ML"),
+                                 c("Pro Max" = "promax",
+                                   "VariMax" = "varimax",
+                                   "None" = "none"
+                                 ), selected = "promax")
+                  ),
+                  
+                  box(
+                    radioButtons("pafaoption", strong("PC or PAF: for Parallel Analysis"),
+                                 c(
+                                   "PAF" = "fa",
+                                   "PC" = "cp",
+                                   "Both" = "both"
+                                 ), selected = "fa")
+                  ),
+                  box(
+                    radioButtons("pafmoption", strong("Factor Method: for Parallel Analysis"),
+                                 c("Maximum likelihood" = "ML",
+                                   "Minimum Residual" = "minres",
+                                   "Generalized least squares" = "gls",
+                                   "Weighted least squares (sometimes called ADF estimation)" = "wls",
+                                   "Unweighted least squares" = "uls",
+                                   "Principal Factor Solution" = "pa"
+                                 ), selected = "ML")
+                  )
+                )
+              ),
+              
               
               # If using PLS then specify measurement and structural model
               conditionalPanel(
@@ -135,7 +197,6 @@ dashboardPage(
                 
                 fluidRow(
                   box( width = 8, 
-                    h3("Specify Inner Model"),
                     aceEditor("plsinner", mode="r", 
                               value="
 PEW <- PUW <- PEUW <- PEA <- PUA <- PEUA <-c(0,0,0,0,0,0,0,0)
@@ -157,7 +218,7 @@ wear_pls",
               
               # Conditional Panel to show up if doing CBSEM
               conditionalPanel(
-                condition = "input.anal != 'pls'",
+                condition = "input.anal == 'sem' || input.anal == 'growth' || input.anal == 'cfa'",
                 fluidRow(
                   h3("Estimator Options"),
                   box("Estimator Options", icon = icon("table", lib = "font-awesome"),
@@ -213,6 +274,17 @@ wear_pls",
               h2("Result"),
               
               conditionalPanel(
+                condition = "input.anal == 'efa'",
+                fluidRow(
+                  box(
+                    h3("Output"),
+                    verbatimTextOutput("resultefa")
+                    ,width = 12
+                  )
+                )
+              ),
+              
+              conditionalPanel(
                 condition = "input.anal == 'pls'",
                 fluidRow(
                   box(
@@ -224,7 +296,7 @@ wear_pls",
               ),
               
               conditionalPanel(
-                condition = "input.anal != 'pls'",
+                condition = "input.anal == 'sem' || input.anal == 'growth' || input.anal == 'cfa'",
                 fluidRow(
                   box(
                     h3("Standardized Estimates"),
@@ -243,7 +315,20 @@ wear_pls",
       tabItem(tabName = "plot",
               
               conditionalPanel(
-                condition = "input.anal != 'pls'",
+                condition = "input.anal == 'efa'",
+                fluidRow(
+                  box(width = 12,
+                      h2("EFA Factor Plot"),
+                      fluidRow(
+                        box(
+                          plotOutput("plot2", height = 700), width = 12
+                        )
+                      ))
+                )
+              ),
+              
+              conditionalPanel(
+                condition = "input.anal != 'pls' && input.anal != 'efa'",
                 fluidRow(
                   box(width = 12,
                     h2("Plot"),
@@ -285,7 +370,8 @@ wear_pls",
                   
                   box(
                     h3("Diagram"), plotOutput("plot", height = 700), width = 12
-                  )),
+                  )
+                  ),
                 fluidRow(
                   box(
                     p("Tree"),
@@ -315,7 +401,8 @@ wear_pls",
                 )
 
       )
-      )
+      
+    )
       ,
       
       # Sixth tab: Diagnostic

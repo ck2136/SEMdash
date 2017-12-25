@@ -78,17 +78,36 @@ shinyServer(function(input, output) {
   })
   
   
-  # CFA, PATH, GCM Analysis
+  # EFA, CFA, PATH, GCM Analysis
   
   get.text <- reactive({
     input$model
   })
+  
+  output$Variablesnonpls <- renderUI({
+    selectInput('vars2', 'Variables', names(filedata()) , multiple = TRUE)
+  })
+  
+  # EFA data selection of the indicators for factor analysis
+  redfilenonpls <- reactive({
+    select(filedata(), input$vars2)
+  })
+
   
   est <- reactive({
     
     dat <- filedata()
     
     model <- get.text()
+    
+    if(input$anal == "efa" & input$efalysisopt == "ML"){
+      fit <- factanal(~., data=redfilenonpls(), factors = input$numfactor, rotation = input$rotfactor)
+    }
+    
+    if(input$anal == "efa" & input$efalysisopt == "pa"){
+      fit <- fa.parallel(x = redfilenonpls(), fa=input$pafaoption, fm = input$pafmoption)
+    }
+    
     
     if(input$anal == "cfa"){
       fit <- cfa(model, data=dat, estimator = input$estimatoroptions, se = input$seoptions,
@@ -148,18 +167,27 @@ shinyServer(function(input, output) {
   # Make Plots
   
   makeplot <- function(){
-    if(input$anal != 'pls'){
+    if(input$anal != 'pls' & input$anal != 'efa'){
       res <- est()$fit
       semPaths(res, input$pltopt, style=input$pltstyl, layout = input$lay, edge.label.cex=.8, fade=F, gray=T)
-    } else {
+    } else if(input$anal == 'pls') {
       res <- plsmod()
       plot(plsmod())
+    } 
+  }
+  
+  makeplot2 <- function(){
+    if(input$anal == 'efa' & input$efalysisopt == 'pa'){
+      fa.parallel(x = redfilenonpls(), fa=input$pafaoption, fm = input$pafmoption)
     }
-    
   }
   
   output$plot <- renderPlot({
     print(makeplot())
+  })
+  
+  output$plot2 <- renderPlot({
+    makeplot2()
   })
   
   output$plsinner <- renderPlot({
@@ -190,9 +218,16 @@ shinyServer(function(input, output) {
     res
   })
   result1 <- reactive({
-    if(input$anal != 'pls'){
+    if(input$anal == 'sem' || input$anal == 'growth' || input$anal == 'cfa'){
       res <- est()$fit
       res <- summary(res, standardized=TRUE, fit.measures=TRUE)
+    }
+    res
+  })
+  
+  result2 <- reactive({
+    if(input$anal == 'efa'){
+      res <- est()
     }
     res
   })
@@ -202,6 +237,9 @@ shinyServer(function(input, output) {
   })
   output$result1 <- renderPrint({
     result1()
+  })
+  output$resultefa <- renderPrint({
+    result2()
   })
   outputOptions(output, 'result', suspendWhenHidden=FALSE)
   # Rsquared
