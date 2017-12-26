@@ -59,21 +59,21 @@ dashboardPage(
               fileInput('datafile', 'Choose CSV file',
                         accept=c('text/csv', 'text/comma-separated-values,text/plain')),
               
-              h2("Select Variables"),
+              h3("Descriptive Statistics: Select variables"),
               uiOutput("Variables"),
               
               
               # View summary statistics
-              h3("Summary Statistics"),
+              h3("1. Summary Statistics"),
               
               fluidRow( verbatimTextOutput("sum")),
               
-              h3("Correlation"),
+              h3("2. Correlation"),
               
               fluidRow(verbatimTextOutput("correl")),
               
               # Create row to check the data
-              h3("Data View"),
+              h3("3. Data View"),
               fluidRow( dataTableOutput("filetable")),
               
               strong('R session info'),
@@ -116,7 +116,7 @@ dashboardPage(
               )),
               
             
-              h3("Specify the model"),
+              h3("Specify the model and/or variables"),
               
               p('For CBSEM See',
                 a("lavaan", href="http://lavaan.ugent.be/", target="_blank"),
@@ -125,7 +125,7 @@ dashboardPage(
               
               # Conditional Panel if Choosing Exploratory Factor Analysis
               conditionalPanel(
-                condition = "input.anal != 'pls'",
+                condition = "input.anal == 'sem' || input.anal == 'growth' || input.anal == 'cfa'",
                 
                 fluidRow(
                   box(
@@ -136,10 +136,7 @@ dashboardPage(
                               Workoutweek ~ UseDay"
                               , 
                               height = "200px")
-                  ),
-                  box( width = 4,
-                       h3("Select Measurement Variables"),
-                       uiOutput("Variablesnonpls"))
+                  )
                   
                 )
                         
@@ -151,43 +148,55 @@ dashboardPage(
                 condition = "input.anal == 'efa'",
                 fluidRow(
                   box(
+                    width = 8,
+                    h3("Select Measurement Variables"),
+                    uiOutput("Variablesefa")
+                  ),
+                  box(
                     radioButtons("efalysisopt", strong("Analysis Options"),
                                      c("Maximum likelihood" = "ML",
-                                       "Parallel Analysis" = "pa"
+                                       "Parallel Analysis" = "pa",
+                                       "Principal Axis Factoring" = "paf",
+                                       "Principal Component Analysis (PCA)" = "pca"
                                      ), selected = "ML")
                         
                     ),
                   box(
                     sliderInput("numfactor", strong("Number of Factors"), step = 1, 
                                 min = 1, max = 10,  value = 3)
-                  ),
+                  )
+                ),
+                fluidRow(
                   box(
-                    radioButtons("rotfactor", strong("Factor Rotation: for ML"),
+                    radioButtons("rotfactor", strong("Factor Rotation"),
                                  c("Pro Max" = "promax",
                                    "VariMax" = "varimax",
                                    "None" = "none"
                                  ), selected = "promax")
                   ),
-                  
                   box(
-                    radioButtons("pafaoption", strong("PC or PAF: for Parallel Analysis"),
-                                 c(
-                                   "PAF" = "fa",
-                                   "PC" = "cp",
-                                   "Both" = "both"
-                                 ), selected = "fa")
-                  ),
-                  box(
-                    radioButtons("pafmoption", strong("Factor Method: for Parallel Analysis"),
+                    radioButtons("pafmoption", strong("Factor Extraction Method"),
                                  c("Maximum likelihood" = "ML",
                                    "Minimum Residual" = "minres",
                                    "Generalized least squares" = "gls",
                                    "Weighted least squares (sometimes called ADF estimation)" = "wls",
                                    "Unweighted least squares" = "uls",
-                                   "Principal Factor Solution" = "pa"
+                                   "Principal Axis Factoring" = "pa"
                                  ), selected = "ML")
                   )
-                )
+                  
+                  
+                ),
+                 fluidRow(
+                   box(
+                     radioButtons("pafaoption", strong("PC or FA: for Parallel Analysis"),
+                                  c(
+                                    "Factor Analysis (FA)" = "fa",
+                                    "Principal Componenta ANalysis (PCA)" = "pc",
+                                    "Both" = "both"
+                                  ), selected = "fa")
+                   )
+                 )
               ),
               
               
@@ -274,7 +283,18 @@ wear_pls",
               h2("Result"),
               
               conditionalPanel(
-                condition = "input.anal == 'efa'",
+                condition = "input.anal == 'efa' && input.efalysisopt == 'pca'",
+                fluidRow(
+                  box(
+                    h3("Output"),
+                    verbatimTextOutput("resultefapca")
+                    ,width = 12
+                  )
+                )
+              ),
+              
+              conditionalPanel(
+                condition = "input.anal == 'efa' && input.efalysisopt != 'pca'",
                 fluidRow(
                   box(
                     h3("Output"),
@@ -315,7 +335,33 @@ wear_pls",
       tabItem(tabName = "plot",
               
               conditionalPanel(
-                condition = "input.anal == 'efa'",
+                condition = "input.anal == 'efa' && input.efalysisopt == 'pca'",
+                fluidRow(
+                  box(width = 12,
+                      h2("Principal Component Plot"),
+                      fluidRow(
+                        box(
+                          plotOutput("plot4")
+                        )
+                      ),
+                      fluidRow(
+                        box(
+                          plotOutput("plot3", height = 700), width = 12
+                        )
+                      ),
+                      fluidRow(
+                        box(
+                          width = 4,
+                          h3("Select Grouping Variable"),
+                          uiOutput("Variablepcagroup")
+                        )
+                      )
+                      )
+                )
+              ),
+              
+              conditionalPanel(
+                condition = "input.anal == 'efa' && input.efalysisopt != 'pca'",
                 fluidRow(
                   box(width = 12,
                       h2("EFA Factor Plot"),

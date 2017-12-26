@@ -16,6 +16,7 @@ library(lavaan)
 library("semPlot")
 library(formattable)
 library(plspm)
+library(ggfortify)
 
 # Define server logic required to draw a histogram
 shinyServer(function(input, output) {
@@ -35,7 +36,7 @@ shinyServer(function(input, output) {
   
   # This allows user to select variables in the filedata
   output$Variables <- renderUI({
-    selectInput('vars', 'Variables', names(filedata()) , multiple = TRUE)
+    selectInput('vars', 'Variables for descriptive statistics', names(filedata()) , multiple = TRUE)
   })
   
   
@@ -84,12 +85,18 @@ shinyServer(function(input, output) {
     input$model
   })
   
-  output$Variablesnonpls <- renderUI({
+  
+  output$Variablesefa <- renderUI({
     selectInput('vars2', 'Variables', names(filedata()) , multiple = TRUE)
   })
   
+  output$Variablepcagroup <- renderUI({
+    selectInput('vars3', 'Grouping Variable', names(redfileefa()) , multiple = FALSE)
+  })
+  
+  
   # EFA data selection of the indicators for factor analysis
-  redfilenonpls <- reactive({
+  redfileefa <- reactive({
     select(filedata(), input$vars2)
   })
 
@@ -101,13 +108,20 @@ shinyServer(function(input, output) {
     model <- get.text()
     
     if(input$anal == "efa" & input$efalysisopt == "ML"){
-      fit <- factanal(~., data=redfilenonpls(), factors = input$numfactor, rotation = input$rotfactor)
+      fit <- factanal(~., data=redfileefa(), factors = input$numfactor, rotation = input$rotfactor)
     }
     
     if(input$anal == "efa" & input$efalysisopt == "pa"){
-      fit <- fa.parallel(x = redfilenonpls(), fa=input$pafaoption, fm = input$pafmoption)
+      fit <- fa.parallel(x = redfileefa(), fa=input$pafaoption, fm = input$pafmoption)
     }
     
+    if(input$anal == "efa" & input$efalysisopt == "paf"){
+      fit <- fa(redfileefa(), nfactors = input$numfactor, rotate = input$rotfactor, residuals = TRUE, SMC = TRUE, fm = input$pafmoption)
+    }
+    
+    if(input$anal == "efa" & input$efalysisopt == "pca"){
+      fit <- princomp(redfileefa())
+    }
     
     if(input$anal == "cfa"){
       fit <- cfa(model, data=dat, estimator = input$estimatoroptions, se = input$seoptions,
@@ -178,7 +192,18 @@ shinyServer(function(input, output) {
   
   makeplot2 <- function(){
     if(input$anal == 'efa' & input$efalysisopt == 'pa'){
-      fa.parallel(x = redfilenonpls(), fa=input$pafaoption, fm = input$pafmoption)
+      fa.parallel(x = redfileefa(), fa=input$pafaoption, fm = input$pafmoption)
+    }
+  }
+  # For Principale Component Analysis Plots
+  makeplot3 <- function(){
+    if(input$anal == 'efa' & input$efalysisopt == 'pca'){
+      autoplot(princomp(~., redfileefa()), colour = input$vars3)
+    }
+  }
+  makeplot4 <- function(){
+    if(input$anal == 'efa' & input$efalysisopt == 'pca'){
+      plot(princomp(~., redfileefa()), main = "Principal Component Variance Plot")
     }
   }
   
@@ -188,6 +213,12 @@ shinyServer(function(input, output) {
   
   output$plot2 <- renderPlot({
     makeplot2()
+  })
+  output$plot3 <- renderPlot({
+    makeplot3()
+  })
+  output$plot4 <- renderPlot({
+    makeplot4()
   })
   
   output$plsinner <- renderPlot({
@@ -232,6 +263,13 @@ shinyServer(function(input, output) {
     res
   })
   
+  resultpca <- reactive({
+    if(input$anal == 'efa' && input$efalysisopt == 'pca'){
+      res <- est()
+    }
+    res$fit$loadings
+  })
+  
   output$result <- renderPrint({
     result()
   })
@@ -241,6 +279,10 @@ shinyServer(function(input, output) {
   output$resultefa <- renderPrint({
     result2()
   })
+  output$resultefapca <- renderPrint({
+    resultpca()
+  })
+  
   outputOptions(output, 'result', suspendWhenHidden=FALSE)
   # Rsquared
   
